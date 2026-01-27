@@ -19,8 +19,6 @@ from sklearn.metrics import (
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.neighbors import KNeighborsClassifier
-
-# Image processing
 from skimage.feature import local_binary_pattern
 
 
@@ -119,12 +117,6 @@ def load_dataset(data_dir, img_size=(96, 96), max_per_class=None, max_classes=No
 # =========================================================
 
 def show_predictions_with_recon(X_test, y_test, y_pred, X_train, y_train, reconstruct_fn, method_name="Method", max_show=5, save_path=None):
-    """
-    Shows 3 columns:
-    1. Test Image (Original)
-    2. Reconstructed Image
-    3. Predicted Class Representative
-    """
     idx_correct = np.where(y_test == y_pred)[0]
     idx_wrong = np.where(y_test != y_pred)[0]
 
@@ -203,16 +195,6 @@ def show_predictions_with_recon_eigenfaces(
     save_path=None,
     show=True
 ):
-    """
-    Shows 3 columns for EigenFaces:
-    1) Test image (original)
-    2) EigenFaces reconstruction
-    3) Representative image of predicted class (from training set)
-
-    - Mixes correct and wrong predictions
-    - Adds green/red border for correctness
-    - Saves the figure if save_path is provided
-    """
 
     if eigen_model.mean is None or eigen_model.W is None:
         raise ValueError("❌ EigenFaces model must be fitted before calling this function.")
@@ -437,10 +419,6 @@ def extract_and_save_eigenfaces_bases(eigen_model, H, W, n_show=16,
                                       show=True):
     """
     Extract and save EigenFaces bases from fitted EigenFaces model.
-
-    Saves:
-      - Image grid (png)
-      - Raw bases array (npy) with shape (n_show, H, W)
     """
     if eigen_model.W is None:
         raise ValueError("❌ EigenFaces model must be fitted before extracting bases.")
@@ -454,7 +432,6 @@ def extract_and_save_eigenfaces_bases(eigen_model, H, W, n_show=16,
 
     bases = np.array(bases, dtype=np.float32)  # (n_show, H, W)
 
-    # Save npy
     np.save(save_npy, bases)
     print(f"✅ Saved EigenFaces bases array: {save_npy} | shape={bases.shape}")
 
@@ -487,10 +464,6 @@ def extract_and_save_tensorfaces_bases(tensor_model, H, W, n_show=16,
                                        show=True):
     """
     Extract and save TensorFacesLite pixel bases (U_p columns).
-
-    Saves:
-      - Image grid (png)
-      - Raw bases array (npy) with shape (n_show, H, W)
     """
     if tensor_model.U_p is None:
         raise ValueError("❌ TensorFacesLite model must be fitted before extracting bases.")
@@ -504,11 +477,9 @@ def extract_and_save_tensorfaces_bases(tensor_model, H, W, n_show=16,
 
     bases = np.array(bases, dtype=np.float32)  # (n_show, H, W)
 
-    # Save npy
     np.save(save_npy, bases)
     print(f"✅ Saved TensorFaces bases array: {save_npy} | shape={bases.shape}")
 
-    # Plot grid
     cols = int(np.ceil(np.sqrt(n_show)))
     rows = int(np.ceil(n_show / cols))
 
@@ -629,7 +600,6 @@ class FisherFaces:
 
 
 # --- D. TENSORFACES LOGIC ---
-
 def parse_light(fn):
     """Parses light condition from filename (CroppedYaleB format)."""
     base = os.path.splitext(os.path.basename(fn))[0]
@@ -739,7 +709,6 @@ class TensorFacesLiteRealLight:
         # Solve for coefficients 'a' (subject weights) for each light condition
         for j, Mjt in enumerate(self.Mjt_list):
             if self.use_ridge:
-                # Ridge: (M^T M + lam I)^-1 M^T y
                 AtA = Mjt.T @ Mjt
                 AtA.flat[::AtA.shape[0]+1] += self.lam
                 rhs = Mjt.T @ y
@@ -762,7 +731,6 @@ class TensorFacesLiteRealLight:
 
     def predict(self, X_test):
         preds = []
-        # No tqdm here to keep output clean during analysis
         for img in X_test:
             preds.append(self.predict_one(img))
         return np.array(preds)
@@ -826,12 +794,12 @@ def eigenfaces_hyperparams_analysis(eigen_model, X_train, y_train, X_test, y_tes
     ax1.tick_params(axis='y', labelcolor=color)
     ax1.grid(True, linestyle="--", alpha=0.5)
 
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    ax2 = ax1.twinx()  
     color = 'tab:red'
     ax2.set_ylabel('Execution Time (seconds)', color=color, fontsize=12, fontweight='bold')
     ax2.plot(ks, times, marker="s", markersize=8, linewidth=2.5, color=color, linestyle='--', label='Time')
     ax2.tick_params(axis='y', labelcolor=color)
-    ax2.grid(False) # Turn off grid for second axis to avoid clutter
+    ax2.grid(False) 
 
     plt.title("EigenFaces: Accuracy vs. Time tradeoff", fontsize=14, fontweight='bold')
     fig.tight_layout()
@@ -842,27 +810,26 @@ def eigenfaces_hyperparams_analysis(eigen_model, X_train, y_train, X_test, y_tes
 def tensorfaces_single_param_analysis(D_train, subjects, lights, X_test, y_test, H, W,
                                       param_name, param_values,
                                       fixed_rS=30, fixed_rL=10, fixed_rP=150, fixed_lam=0.01,
-                                      save_prefix="tensor_param", show=True):
+                                      save_prefix="tensor_param", show=True,
+                                      repeat_time=5):
     """
-    Analyze sensitivity of TensorFacesLiteRealLight to one parameter:
-      param_name in {"rS", "rL", "rP", "lam"}
+    فقط زمان را چند بار اجرا می‌کند و میانگین می‌گیرد.
+    """
 
-    Prints metrics for each value in terminal and saves plots.
-    """
     accs = []
-    times = []
+    times_mean = []
 
     valid_params = {"rS", "rL", "rP", "lam"}
     if param_name not in valid_params:
         raise ValueError(f"param_name must be one of: {sorted(list(valid_params))}")
 
     print("\n" + "="*75)
-    print(f"📌 TensorFacesLite Parameter Sensitivity: {param_name}")
+    print(f"📌 TensorFacesLite Mean Time Sensitivity: {param_name}  (repeat_time={repeat_time})")
     print("="*75)
     print(f"Fixed: rS={fixed_rS}, rL={fixed_rL}, rP={fixed_rP}, lam={fixed_lam}")
     print("-" * 75)
-    print(f"| {param_name:^10} | {'Accuracy (%)':^15} | {'Time (s)':^15} |")
-    print("-" * 50)
+    print(f"| {param_name:^10} | {'Accuracy (%)':^15} | {'Mean Time (s)':^15} |")
+    print("-" * 55)
 
     for v in param_values:
 
@@ -879,56 +846,45 @@ def tensorfaces_single_param_analysis(D_train, subjects, lights, X_test, y_test,
         elif param_name == "lam":
             lam = float(v)
 
-        start = time.time()
-        model = TensorFacesLiteRealLight(H, W, ranks=(rS, rL, rP), lam=lam)
-        model.fit(D_train, subjects, lights)
-        preds = model.predict(X_test)
-        duration = time.time() - start
+        # --------- time averaging ----------
+        run_times = []
+        for _ in range(repeat_time):
+            start = time.perf_counter()
+            model = TensorFacesLiteRealLight(H, W, ranks=(rS, rL, rP), lam=lam)
+            model.fit(D_train, subjects, lights)
+            preds = model.predict(X_test)
+            end = time.perf_counter()
+            run_times.append(end - start)
 
+        mean_t = float(np.mean(run_times))
+        times_mean.append(mean_t)
+
+        # accuracy فقط یک بار (از آخرین preds)
         acc = accuracy_score(y_test, preds) * 100
-
         accs.append(acc)
-        times.append(duration)
 
-        print(f"| {str(v):^10} | {acc:^15.2f} | {duration:^15.4f} |")
+        print(f"| {str(v):^10} | {acc:^15.2f} | {mean_t:^15.4f} |")
 
     # ===============================
-    # Plot Accuracy
+    # Plot Time (Mean)
     # ===============================
     plt.figure(figsize=(8, 5))
-    plt.plot(param_values, accs, marker="o", linewidth=2.5)
+    plt.plot(param_values, times_mean, marker="s", linewidth=2.5)
     plt.xlabel(param_name)
-    plt.ylabel("Accuracy (%)")
-    plt.title(f"TensorFacesLite: Accuracy vs {param_name}")
+    plt.ylabel("Mean Time (seconds)")
+    plt.title(f"TensorFacesLite: Mean Time vs {param_name} (avg of {repeat_time} runs)")
     plt.grid(True, linestyle="--", alpha=0.6)
     plt.tight_layout()
 
-    out1 = f"{save_prefix}_{param_name}_acc.png"
-    plt.savefig(out1, dpi=200, bbox_inches="tight")
-    print(f"\n✅ Saved: {out1}")
-    if show:
-        plt.show()
-    plt.close()
-
-    # ===============================
-    # Plot Time
-    # ===============================
-    plt.figure(figsize=(8, 5))
-    plt.plot(param_values, times, marker="s", linewidth=2.5)
-    plt.xlabel(param_name)
-    plt.ylabel("Time (seconds)")
-    plt.title(f"TensorFacesLite: Time vs {param_name}")
-    plt.grid(True, linestyle="--", alpha=0.6)
-    plt.tight_layout()
-
-    out2 = f"{save_prefix}_{param_name}_time.png"
+    out2 = f"{save_prefix}_{param_name}_time_mean.png"
     plt.savefig(out2, dpi=200, bbox_inches="tight")
     print(f"✅ Saved: {out2}")
     if show:
         plt.show()
     plt.close()
 
-    return accs, times
+    return accs, times_mean
+
 
 
 def show_and_save_predictions_with_reconstruction(
@@ -939,8 +895,8 @@ def show_and_save_predictions_with_reconstruction(
     max_show=6,
     save_path=None,
     show=True,
-    layout="input_pred_recon",   # or "input_recon_pred"
-    use_norm_for_recon=True      # normalize recon output for visualization
+    layout="input_pred_recon",   
+    use_norm_for_recon=True     
 ):
 
     idx_correct = np.where(y_test == y_pred)[0]
@@ -1176,7 +1132,7 @@ def tensorfaces_hyperparams_analysis(D_train, subjects, lights, X_test, y_test, 
 
 
 def show_preprocessing_steps(original_img, mean_face, H, W, save_path=None, show=True):
-    """Shows original, mean face, and centered image."""
+
     mean_img = mean_face.reshape(H, W) if mean_face.ndim == 1 else mean_face
     centered = original_img.astype(np.float32) - mean_img.astype(np.float32)
     
@@ -1210,7 +1166,7 @@ def show_preprocessing_steps(original_img, mean_face, H, W, save_path=None, show
 
 
 def show_diff_subjects(X_img, y, subject_ids=None, save_path=None, max_cols=7):
-    """Shows one representative image from multiple subjects."""
+
     if subject_ids is None:
         subject_ids = np.unique(y)
     n = len(subject_ids)
@@ -1239,7 +1195,7 @@ def show_diff_subjects(X_img, y, subject_ids=None, save_path=None, max_cols=7):
 
 
 def show_same_subject_diff_illumination(X_img, y, subject_id, n_lights=16, save_path=None):
-    """Shows multiple images from the same subject (first N samples)."""
+
     idxs = np.where(y == subject_id)[0][:n_lights]
     cols = 8
     rows = int(np.ceil(len(idxs) / cols))
@@ -1287,10 +1243,7 @@ def show_same_subject_diff_poses(X_img, y, subject_id, n_poses=9, save_path=None
 
 def reconstruct_image_with_different_k_eigenfaces(eigen_model, test_image, ks, H, W,
                                                   save_path="eigen_recon_k.png", show=True):
-    """
-    Reconstruct a single image using different k values.
-    Prints MSE for each k and saves the plot.
-    """
+ 
     if eigen_model.mean is None or eigen_model.W is None:
         raise ValueError("EigenFaces model must be fitted before calling this function.")
 
@@ -1335,110 +1288,63 @@ def reconstruct_image_with_different_k_eigenfaces(eigen_model, test_image, ks, H
 
 def eigenfaces_accuracy_time_vs_k(eigen_model, X_train, y_train, X_test, y_test,
                                   ks, num_classes,
-                                  save_prefix="eigen_k_analysis", show=True):
-    """
-    Runs EigenFaces for each k:
-      - Prints accuracy and time in terminal
-      - Saves 3 plots:
-          1) Accuracy vs k
-          2) Time vs k
-          3) Dual-axis Accuracy & Time vs k
-    """
+                                  save_prefix="eigen_k_analysis", show=True,
+                                  repeat_time=5):
+
     original_k = eigen_model.k
     accs = []
-    times = []
+    times_mean = []
 
     print("\n" + "="*70)
-    print("📌 EigenFaces Accuracy & Time vs k")
+    print(f"📌 EigenFaces Accuracy & Mean Time vs k  (repeat_time={repeat_time})")
     print("="*70)
-    print(f"| {'k':^10} | {'Accuracy (%)':^15} | {'Time (s)':^15} |")
-    print("-" * 50)
+    print(f"| {'k':^10} | {'Accuracy (%)':^15} | {'Mean Time (s)':^15} |")
+    print("-" * 55)
 
     for k in ks:
         eigen_model.k = int(k)
 
-        t0 = time.time()
-        eigen_model.fit(X_train, y_train, num_classes)
-        preds = eigen_model.predict(X_test)
-        t1 = time.time()
+        # --------- time averaging ----------
+        run_times = []
+        for _ in range(repeat_time):
+            t0 = time.perf_counter()
+            eigen_model.fit(X_train, y_train, num_classes)
+            preds = eigen_model.predict(X_test)
+            t1 = time.perf_counter()
+            run_times.append(t1 - t0)
 
+        mean_t = float(np.mean(run_times))
+        times_mean.append(mean_t)
+
+        # accuracy فقط یک بار از آخرین preds حساب میشه (همون قبلی)
         acc = accuracy_score(y_test, preds) * 100
-        duration = t1 - t0
-
         accs.append(acc)
-        times.append(duration)
 
-        print(f"| {k:^10} | {acc:^15.2f} | {duration:^15.4f} |")
+        print(f"| {k:^10} | {acc:^15.2f} | {mean_t:^15.4f} |")
 
     eigen_model.k = original_k
 
     # ===============================
-    # Plot 1: Accuracy vs k
+    # Plot Time vs k (Mean)
     # ===============================
     plt.figure(figsize=(8, 5))
-    plt.plot(ks, accs, marker="o", linewidth=2.5)
+    plt.plot(ks, times_mean, marker="s", linewidth=2.5)
     plt.xlabel("k (Eigenfaces Components)")
-    plt.ylabel("Accuracy (%)")
-    plt.title("EigenFaces: Accuracy vs k")
+    plt.ylabel("Mean Time (seconds)")
+    plt.title(f"EigenFaces: Mean Time vs k (avg of {repeat_time} runs)")
     plt.grid(True, linestyle="--", alpha=0.6)
     plt.tight_layout()
 
-    out1 = f"{save_prefix}_accuracy.png"
-    plt.savefig(out1, dpi=200, bbox_inches="tight")
-    print(f"\n✅ Saved: {out1}")
-    if show:
-        plt.show()
-    plt.close()
-
-    # ===============================
-    # Plot 2: Time vs k
-    # ===============================
-    plt.figure(figsize=(8, 5))
-    plt.plot(ks, times, marker="s", linewidth=2.5)
-    plt.xlabel("k (Eigenfaces Components)")
-    plt.ylabel("Time (seconds)")
-    plt.title("EigenFaces: Time vs k")
-    plt.grid(True, linestyle="--", alpha=0.6)
-    plt.tight_layout()
-
-    out2 = f"{save_prefix}_time.png"
+    out2 = f"{save_prefix}_time_mean.png"
     plt.savefig(out2, dpi=200, bbox_inches="tight")
     print(f"✅ Saved: {out2}")
     if show:
         plt.show()
     plt.close()
 
-    # ===============================
-    # Plot 3: Dual-axis
-    # ===============================
-    fig, ax1 = plt.subplots(figsize=(9, 5))
-
-    ax1.set_xlabel("k (Eigenfaces Components)")
-    ax1.set_ylabel("Accuracy (%)")
-    ax1.plot(ks, accs, marker="o", linewidth=2.5, label="Accuracy")
-    ax1.grid(True, linestyle="--", alpha=0.6)
-
-    ax2 = ax1.twinx()
-    ax2.set_ylabel("Time (seconds)")
-    ax2.plot(ks, times, marker="s", linewidth=2.5, linestyle="--", label="Time")
-
-    plt.title("EigenFaces: Accuracy & Time Trade-off")
-    fig.tight_layout()
-
-    out3 = f"{save_prefix}_dual.png"
-    plt.savefig(out3, dpi=200, bbox_inches="tight")
-    print(f"✅ Saved: {out3}")
-
-    if show:
-        plt.show()
-    plt.close()
-
-    return accs, times
+    return accs, times_mean
 
 
-# =========================================================
-# EXTRA: Compatible base + example saving for TensorFacesLiteRealLight
-# =========================================================
 
 def save_bases_eigen_vs_tensorlite(eigen, tensorlite, out="bases.png", H=96, W=96, n_show=8):
     """
@@ -1521,6 +1427,8 @@ def save_examples_eigen_vs_tensorlite(Xte, yte, preds, eigen, tensorlite, out="e
     plt.savefig(out, dpi=200, bbox_inches="tight")
     print("✅ Saved", out)
     plt.close()
+
+
 
 # =========================================================
 # 7. MAIN EXECUTION
@@ -1644,11 +1552,12 @@ def main():
 )
 
 
-    accs, times = eigenfaces_accuracy_time_vs_k(
+    accs, mean_times = eigenfaces_accuracy_time_vs_k(
     eigen, X_train, y_train, X_test, y_test,
     ks=[10, 30, 50, 100, 150, 300],
     num_classes=len(subjects),
-    save_prefix="analysis_eigen"
+    save_prefix="analysis_eigen",
+    repeat_time=7
 )
 
 
@@ -1721,7 +1630,7 @@ def main():
     fixed_rP=150,
     fixed_lam=0.01,
     save_prefix="analysis_tensor",
-    show=True
+    repeat_time=7
 )
 
     tensorfaces_single_param_analysis(
@@ -1730,7 +1639,8 @@ def main():
     param_name="rP",
     param_values=[50, 100, 150, 200, 300],
     fixed_rS=30, fixed_rL=10, fixed_rP=150, fixed_lam=0.01,
-    save_prefix="analysis_tensor"
+    save_prefix="analysis_tensor",
+    repeat_time=7
 )
 
 
@@ -1740,7 +1650,8 @@ def main():
     param_name="rS",
     param_values=[5, 10, 15, 20, 25, 30],
     fixed_rS=30, fixed_rL=10, fixed_rP=150, fixed_lam=0.01,
-    save_prefix="analysis_tensor"
+    save_prefix="analysis_tensor",
+    repeat_time=7
 )
 
 
